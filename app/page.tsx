@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Filter, RefreshCw, ChevronLeft, ChevronRight, Edit, X, Eye } from "lucide-react";
+import { Filter, RefreshCw, ChevronLeft, ChevronRight, Edit, X, Eye, Send } from "lucide-react";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { API_BASE_URL } from "@/lib/utils";
 
 interface VideoJob {
   id: number;
@@ -24,6 +25,10 @@ interface VideoJob {
 
 interface VideoJobDetail extends VideoJob {
   raw_selfie_url: string | null;
+  normalized_image_url: string | null;
+  lipsync_seg2_url: string | null;
+  lipsync_seg4_url: string | null;
+  final_video_url: string | null;
   terms_accepted: boolean | null;
   video_count: number | null;
   locked_by: string | null;
@@ -99,7 +104,7 @@ export default function VideoJobsPage() {
       if (filters.end_date) params.append("end_date", filters.end_date);
 
       const response = await fetch(
-        `http://localhost:8000/api/v1/video-jobs/list?${params.toString()}`,
+        `${API_BASE_URL}/api/v1/video-jobs/list?${params.toString()}`,
         { headers: getAuthHeaders() }
       );
 
@@ -129,7 +134,7 @@ export default function VideoJobsPage() {
     setShowDetailModal(true);
     try {
       const response = await fetch(
-        `http://localhost:8000/api/v1/video-jobs/${jobId}`,
+        `${API_BASE_URL}/api/v1/video-jobs/${jobId}`,
         { headers: getAuthHeaders() }
       );
 
@@ -196,7 +201,7 @@ export default function VideoJobsPage() {
 
     try {
       const response = await fetch(
-        `http://localhost:8000/api/v1/video-jobs/update-job?job_id=${selectedJob.id}&status=${newStatus}`,
+        `${API_BASE_URL}/api/v1/video-jobs/update-job?job_id=${selectedJob.id}&status=${newStatus}`,
         {
           method: "PATCH",
           headers: getAuthHeaders(),
@@ -241,6 +246,40 @@ export default function VideoJobsPage() {
   const closeDetail = () => {
     setShowDetailModal(false);
     setJobDetail(null);
+  };
+
+  const [sendingVideo, setSendingVideo] = useState(false);
+
+  const handleSendVideo = async (jobId: number) => {
+    if (!confirm("Are you sure you want to send this video to the user via WhatsApp?")) return;
+
+    setSendingVideo(true);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/video-jobs/${jobId}/send-video`,
+        { method: "POST", headers: getAuthHeaders() }
+      );
+
+      if (response.status === 401 || response.status === 403) {
+        handleUnauthorized();
+        return;
+      }
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success(data.message || "Video sent successfully!", { position: "top-right", autoClose: 3000 });
+        setJobDetail((prev) => prev ? { ...prev, status: "sent" } : null);
+        fetchJobs();
+      } else {
+        toast.error(data.detail || "Failed to send video", { position: "top-right", autoClose: 3000 });
+      }
+    } catch (error) {
+      console.error("Send video error:", error);
+      toast.error("Failed to send video", { position: "top-right", autoClose: 3000 });
+    } finally {
+      setSendingVideo(false);
+    }
   };
 
   const getStatusBadgeColor = (status: string | null) => {
@@ -636,11 +675,31 @@ export default function VideoJobsPage() {
                     />
                   </div>
 
-                  {/* Photo URL */}
-                  {jobDetail.raw_selfie_url && (
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <p className="text-xs font-medium text-gray-500 mb-1">Photo URL</p>
-                      <p className="text-xs text-gray-600 break-all font-mono">{jobDetail.raw_selfie_url}</p>
+                  {/* Asset URLs */}
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-gray-700">Asset URLs</h3>
+                    <AssetUrlField label="Raw Selfie" url={jobDetail.raw_selfie_url} />
+                    <AssetUrlField label="Normalized Image" url={jobDetail.normalized_image_url} />
+                    <AssetUrlField label="Lipsync Seg 2" url={jobDetail.lipsync_seg2_url} />
+                    <AssetUrlField label="Lipsync Seg 4" url={jobDetail.lipsync_seg4_url} />
+                    <AssetUrlField label="Final Video" url={jobDetail.final_video_url} />
+                  </div>
+
+                  {/* Send Video Button */}
+                  {jobDetail.final_video_url && jobDetail.status !== "sent" && (
+                    <button
+                      onClick={() => handleSendVideo(jobDetail.id)}
+                      disabled={sendingVideo}
+                      className="w-full px-4 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      <Send className="h-4 w-4" />
+                      {sendingVideo ? "Sending..." : "Send Video via WhatsApp"}
+                    </button>
+                  )}
+
+                  {jobDetail.status === "sent" && (
+                    <div className="w-full px-4 py-3 bg-green-50 border border-green-200 text-green-700 rounded-lg font-semibold text-center text-sm">
+                      Video already sent
                     </div>
                   )}
                 </div>
@@ -719,6 +778,33 @@ export default function VideoJobsPage() {
         )}
       </div>
     </>
+  );
+}
+
+function AssetUrlField({ label, url }: { label: string; url: string | null }) {
+  if (!url) {
+    return (
+      <div className="bg-gray-50 rounded-lg p-3 flex items-center justify-between">
+        <span className="text-xs font-medium text-gray-500">{label}</span>
+        <span className="text-xs text-gray-400">Not available</span>
+      </div>
+    );
+  }
+  return (
+    <div className="bg-gray-50 rounded-lg p-3">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs font-medium text-gray-500">{label}</span>
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+        >
+          Open
+        </a>
+      </div>
+      <p className="text-xs text-gray-600 break-all font-mono">{url}</p>
+    </div>
   );
 }
 
