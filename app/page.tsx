@@ -39,6 +39,8 @@ interface FilterParams {
   status: string;
   failed_stage: string;
   user_id: string;
+  mobile_number: string;
+  job_id: string;
   start_date: string;
   end_date: string;
   page: number;
@@ -56,6 +58,8 @@ export default function VideoJobsPage() {
     status: "",
     failed_stage: "",
     user_id: "",
+    mobile_number: "",
+    job_id: "",
     start_date: "",
     end_date: "",
     page: 1,
@@ -100,6 +104,8 @@ export default function VideoJobsPage() {
       if (filters.status) params.append("status", filters.status);
       if (filters.failed_stage) params.append("failed_stage", filters.failed_stage);
       if (filters.user_id) params.append("user_id", filters.user_id);
+      if (filters.mobile_number) params.append("mobile_number", filters.mobile_number);
+      if (filters.job_id) params.append("job_id", filters.job_id);
       if (filters.start_date) params.append("start_date", filters.start_date);
       if (filters.end_date) params.append("end_date", filters.end_date);
 
@@ -179,6 +185,8 @@ export default function VideoJobsPage() {
       status: "",
       failed_stage: "",
       user_id: "",
+      mobile_number: "",
+      job_id: "",
       start_date: "",
       end_date: "",
       page: 1,
@@ -373,6 +381,32 @@ export default function VideoJobsPage() {
                     <option value="stitch">Stitch</option>
                     <option value="delivery">Delivery</option>
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Mobile Number
+                  </label>
+                  <input
+                    type="text"
+                    value={filters.mobile_number}
+                    onChange={(e) => handleFilterChange("mobile_number", e.target.value)}
+                    placeholder="Enter mobile number"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Job ID
+                  </label>
+                  <input
+                    type="text"
+                    value={filters.job_id}
+                    onChange={(e) => handleFilterChange("job_id", e.target.value)}
+                    placeholder="Enter job ID"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
+                  />
                 </div>
 
                 <div>
