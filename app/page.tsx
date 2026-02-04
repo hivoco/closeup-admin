@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Filter, RefreshCw, ChevronLeft, ChevronRight, Edit, X, Eye, Send } from "lucide-react";
+import { Filter, RefreshCw, ChevronLeft, ChevronRight, Edit, X, Eye, Send, Pencil } from "lucide-react";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { API_BASE_URL } from "@/lib/utils";
@@ -75,6 +75,17 @@ export default function VideoJobsPage() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [jobDetail, setJobDetail] = useState<VideoJobDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+
+  // Edit fields modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingJob, setEditingJob] = useState<VideoJob | null>(null);
+  const [editFields, setEditFields] = useState({
+    gender: "",
+    relationship_status: "",
+    attribute_love: "",
+    vibe: "",
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const getAuthHeaders = (): HeadersInit => {
     const token = localStorage.getItem("admin_token");
@@ -254,6 +265,82 @@ export default function VideoJobsPage() {
   const closeDetail = () => {
     setShowDetailModal(false);
     setJobDetail(null);
+  };
+
+  // Edit fields handlers
+  const handleEditFields = (e: React.MouseEvent, job: VideoJob) => {
+    e.stopPropagation();
+    setEditingJob(job);
+    setEditFields({
+      gender: job.gender || "",
+      relationship_status: job.relationship_status || "",
+      attribute_love: job.attribute_love || "",
+      vibe: job.vibe || "",
+    });
+    setShowEditModal(true);
+  };
+
+  const cancelEdit = () => {
+    setShowEditModal(false);
+    setEditingJob(null);
+    setEditFields({
+      gender: "",
+      relationship_status: "",
+      attribute_love: "",
+      vibe: "",
+    });
+  };
+
+  const confirmEdit = async () => {
+    if (!editingJob) return;
+
+    setSavingEdit(true);
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/video-jobs/${editingJob.id}/fields`,
+        {
+          method: "PATCH",
+          headers: {
+            ...getAuthHeaders(),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            gender: editFields.gender || null,
+            relationship_status: editFields.relationship_status || null,
+            attribute_love: editFields.attribute_love || null,
+            vibe: editFields.vibe || null,
+          }),
+        }
+      );
+
+      if (response.status === 401 || response.status === 403) {
+        handleUnauthorized();
+        return;
+      }
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success(data.message || "Job updated successfully!", {
+          position: "top-right",
+          autoClose: 3000,
+        });
+        setShowEditModal(false);
+        setEditingJob(null);
+        fetchJobs();
+      } else {
+        throw new Error(data.detail || "Failed to update job");
+      }
+    } catch (error: any) {
+      console.error("Edit error:", error);
+      toast.error(error.message || "Failed to update job", {
+        position: "top-right",
+        autoClose: 3000,
+      });
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const [sendingVideo, setSendingVideo] = useState(false);
@@ -582,13 +669,22 @@ export default function VideoJobsPage() {
                               fetchJobDetail(job.id);
                             }}
                             className="text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 transition-colors"
+                            title="View Details"
                           >
                             <Eye className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={(e) => handleEditFields(e, job)}
+                            className="text-green-600 hover:text-green-800 font-semibold flex items-center gap-1 transition-colors"
+                            title="Edit Fields"
+                          >
+                            <Pencil className="h-4 w-4" />
                           </button>
                           <button
                             onClick={(e) => handleUpdateStatus(e, job)}
                             disabled={updatingJobId === job.id}
                             className="text-primary hover:text-primary/80 font-semibold flex items-center gap-1 transition-colors disabled:opacity-50"
+                            title="Update Status"
                           >
                             <Edit className="h-4 w-4" />
                           </button>
@@ -817,6 +913,114 @@ export default function VideoJobsPage() {
                   className="flex-1 px-4 py-3 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {updatingJobId === selectedJob.id ? "Updating..." : "Confirm Update"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Fields Modal */}
+        {showEditModal && editingJob && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4">
+              <h2 className="text-2xl font-bold text-gray-900">Edit Job Fields</h2>
+
+              <div className="space-y-2">
+                <p className="text-sm text-gray-600">
+                  Job ID: <span className="font-semibold text-gray-900">#{editingJob.id}</span>
+                </p>
+                <p className="text-sm text-gray-600">
+                  Mobile: <span className="font-semibold text-gray-900">{editingJob.mobile_number}</span>
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Gender
+                  </label>
+                  <select
+                    value={editFields.gender}
+                    onChange={(e) => setEditFields({ ...editFields, gender: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
+                  >
+                    <option value="">Select gender</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                    <option value="unspecified">Unspecified</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Relationship Status
+                  </label>
+                  <select
+                    value={editFields.relationship_status}
+                    onChange={(e) => setEditFields({ ...editFields, relationship_status: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
+                  >
+                    <option value="">Select relationship</option>
+                    <option value="Married">Married</option>
+                    <option value="Dating">Dating</option>
+                    <option value="Crushing">Crushing</option>
+                    <option value="Situationship">Situationship</option>
+                    <option value="Nanoship">Nanoship</option>
+                    <option value="Long-Distance">Long-Distance</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Attribute Love
+                  </label>
+                  <select
+                    value={editFields.attribute_love}
+                    onChange={(e) => setEditFields({ ...editFields, attribute_love: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
+                  >
+                    <option value="">Select attribute</option>
+                    <option value="Smile">Smile</option>
+                    <option value="Eyes">Eyes</option>
+                    <option value="Hair">Hair</option>
+                    <option value="Face">Face</option>
+                    <option value="Vibe">Vibe</option>
+                    <option value="Sense of Humor">Sense of Humor</option>
+                    <option value="Heart">Heart</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Vibe
+                  </label>
+                  <select
+                    value={editFields.vibe}
+                    onChange={(e) => setEditFields({ ...editFields, vibe: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
+                  >
+                    <option value="">Select vibe</option>
+                    <option value="romantic">Romantic</option>
+                    <option value="rock">Rock</option>
+                    <option value="rap">Rap</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={cancelEdit}
+                  className="flex-1 px-4 py-3 bg-gray-200 text-gray-800 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmEdit}
+                  disabled={savingEdit}
+                  className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingEdit ? "Saving..." : "Save Changes"}
                 </button>
               </div>
             </div>
