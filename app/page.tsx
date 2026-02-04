@@ -323,6 +323,12 @@ export default function VideoJobsPage() {
             </div>
             <div className="flex gap-3">
               <button
+                onClick={() => router.push("/reports")}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold flex items-center gap-2 hover:bg-green-700 transition-colors"
+              >
+                📊 Reports
+              </button>
+              <button
                 onClick={() => setShowFilters(!showFilters)}
                 className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold flex items-center gap-2 hover:bg-gray-300 transition-colors"
               >
