@@ -321,6 +321,7 @@ export default function ReportsPage() {
           <>
             {/* Summary Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
+              <StatsCard label="Total Entries" value={reportData.counts.total} color="#3B82F6" />
               <StatsCard label="Total Users" value={reportData.counts.total_users} color="#8B5CF6" />
               <StatsCard label="Returning Users" value={reportData.counts.returning_users} color="#F97316" />
               <StatsCard label="Sent" value={reportData.counts.status.sent || 0} color="#10B981" />
