@@ -9,8 +9,7 @@ import { API_BASE_URL } from "@/lib/utils";
 
 interface ReportCounts {
   total: number;
-  unique_users: number;
-  new_users: number;
+  total_users: number;
   returning_users: number;
   gender: Record<string, number>;
   status: Record<string, number>;
@@ -323,8 +322,7 @@ export default function ReportsPage() {
             {/* Summary Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
               <StatsCard label="Total Entries" value={reportData.counts.total} color="#3B82F6" />
-              <StatsCard label="Unique Users" value={reportData.counts.unique_users} color="#8B5CF6" />
-              <StatsCard label="New Users" value={reportData.counts.new_users} color="#06B6D4" />
+              <StatsCard label="Total Users" value={reportData.counts.total_users} color="#8B5CF6" />
               <StatsCard label="Returning Users" value={reportData.counts.returning_users} color="#F97316" />
               <StatsCard label="Sent" value={reportData.counts.status.sent || 0} color="#10B981" />
               <StatsCard label="Failed" value={reportData.counts.status.failed || 0} color="#EF4444" />
