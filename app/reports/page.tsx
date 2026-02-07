@@ -24,6 +24,18 @@ interface ReportsResponse {
   counts: ReportCounts;
 }
 
+interface TrendDataPoint {
+  label: string;
+  total_entries: number;
+  total_users: number;
+  returning_users: number;
+}
+
+interface TrendResponse {
+  mode: string;
+  data: TrendDataPoint[];
+}
+
 const COLORS = [
   "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6",
   "#EC4899", "#06B6D4", "#84CC16", "#F97316", "#6366F1"
@@ -35,6 +47,9 @@ export default function ReportsPage() {
   const [startDate, setStartDate] = useState("2026-01-01");
   const [endDate, setEndDate] = useState("");
   const [reportData, setReportData] = useState<ReportsResponse | null>(null);
+  const [trendMode, setTrendMode] = useState<"day" | "week">("day");
+  const [trendData, setTrendData] = useState<TrendDataPoint[]>([]);
+  const [trendLoading, setTrendLoading] = useState(false);
 
   const getAuthHeaders = (): HeadersInit => {
     const token = localStorage.getItem("admin_token");
@@ -52,6 +67,7 @@ export default function ReportsPage() {
       router.push("/login");
     } else {
       fetchReports();
+      fetchTrend();
     }
   }, [router]);
 
@@ -133,14 +149,49 @@ export default function ReportsPage() {
     }
   };
 
+  const fetchTrend = async (mode: "day" | "week" = trendMode) => {
+    setTrendLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.append("mode", mode);
+      if (startDate) params.append("start_date", startDate);
+      if (endDate) params.append("end_date", endDate);
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/video-jobs/reports/trend?${params.toString()}`,
+        { headers: getAuthHeaders() }
+      );
+
+      if (response.status === 401) {
+        handleUnauthorized();
+        return;
+      }
+
+      if (!response.ok) throw new Error("Failed to fetch trend data");
+
+      const data: TrendResponse = await response.json();
+      setTrendData(data.data);
+    } catch (error) {
+      console.error("Trend fetch error:", error);
+    } finally {
+      setTrendLoading(false);
+    }
+  };
+
+  const handleTrendModeChange = (mode: "day" | "week") => {
+    setTrendMode(mode);
+    fetchTrend(mode);
+  };
+
   const handleFilter = () => {
     fetchReports();
+    fetchTrend();
   };
 
   const clearFilters = () => {
     setStartDate("");
     setEndDate("");
-    setTimeout(() => fetchReports(), 0);
+    setTimeout(() => { fetchReports(); fetchTrend(); }, 0);
   };
 
   // Simple bar chart component
@@ -336,6 +387,119 @@ export default function ReportsPage() {
               <StatsCard label="Processing" value={(reportData.counts.status.photo_processing || 0) + (reportData.counts.status.lipsync_processing || 0)} color="#84CC16" />
               <StatsCard label="Uploaded" value={reportData.counts.status.uploaded || 0} color="#6366F1" />
               <StatsCard label="Wait" value={reportData.counts.status.wait || 0} color="#9CA3AF" />
+            </div>
+
+            {/* Trend Chart */}
+            <div className="bg-white rounded-lg shadow p-4 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-800">Trend Overview</h3>
+                <select
+                  value={trendMode}
+                  onChange={(e) => handleTrendModeChange(e.target.value as "day" | "week")}
+                  className="px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="day">Day Wise</option>
+                  <option value="week">Week Wise</option>
+                </select>
+              </div>
+
+              {trendLoading ? (
+                <div className="flex items-center justify-center h-48">
+                  <RefreshCw className="w-6 h-6 animate-spin text-blue-600" />
+                </div>
+              ) : trendData.length === 0 ? (
+                <div className="text-center text-gray-400 py-12">No trend data available</div>
+              ) : (
+                <>
+                  {/* Legend */}
+                  <div className="flex gap-6 mb-4 text-sm">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: "#3B82F6" }} />
+                      <span className="text-gray-600">Total Entries</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: "#8B5CF6" }} />
+                      <span className="text-gray-600">Total Users</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: "#F97316" }} />
+                      <span className="text-gray-600">Returning Users</span>
+                    </div>
+                  </div>
+
+                  {/* Chart */}
+                  <div className="overflow-x-auto">
+                    <div className="flex items-end gap-1" style={{ minWidth: trendData.length * 100, height: 300 }}>
+                      {(() => {
+                        const maxVal = Math.max(...trendData.map(d => Math.max(d.total_entries, d.total_users, d.returning_users)), 1);
+                        const totalEntries = trendData.reduce((s, d) => s + d.total_entries, 0) || 1;
+                        const totalUsers = trendData.reduce((s, d) => s + d.total_users, 0) || 1;
+                        const totalReturning = trendData.reduce((s, d) => s + d.returning_users, 0) || 1;
+
+                        return trendData.map((d, i) => (
+                          <div key={i} className="flex-1 flex flex-col items-center min-w-[80px]">
+                            {/* Bars */}
+                            <div className="flex items-end gap-0.5 w-full justify-center" style={{ height: 240 }}>
+                              {/* Total Entries bar */}
+                              <div className="flex flex-col items-center" style={{ width: "30%" }}>
+                                <div className="text-[10px] text-gray-700 font-medium mb-0.5 whitespace-nowrap">
+                                  {d.total_entries}
+                                </div>
+                                <div className="text-[9px] text-gray-400 mb-0.5">
+                                  {((d.total_entries / totalEntries) * 100).toFixed(0)}%
+                                </div>
+                                <div
+                                  className="w-full rounded-t"
+                                  style={{
+                                    height: `${Math.max((d.total_entries / maxVal) * 180, 4)}px`,
+                                    backgroundColor: "#3B82F6",
+                                  }}
+                                />
+                              </div>
+                              {/* Total Users bar */}
+                              <div className="flex flex-col items-center" style={{ width: "30%" }}>
+                                <div className="text-[10px] text-gray-700 font-medium mb-0.5 whitespace-nowrap">
+                                  {d.total_users}
+                                </div>
+                                <div className="text-[9px] text-gray-400 mb-0.5">
+                                  {((d.total_users / totalUsers) * 100).toFixed(0)}%
+                                </div>
+                                <div
+                                  className="w-full rounded-t"
+                                  style={{
+                                    height: `${Math.max((d.total_users / maxVal) * 180, 4)}px`,
+                                    backgroundColor: "#8B5CF6",
+                                  }}
+                                />
+                              </div>
+                              {/* Returning Users bar */}
+                              <div className="flex flex-col items-center" style={{ width: "30%" }}>
+                                <div className="text-[10px] text-gray-700 font-medium mb-0.5 whitespace-nowrap">
+                                  {d.returning_users}
+                                </div>
+                                <div className="text-[9px] text-gray-400 mb-0.5">
+                                  {((d.returning_users / totalReturning) * 100).toFixed(0)}%
+                                </div>
+                                <div
+                                  className="w-full rounded-t"
+                                  style={{
+                                    height: `${Math.max((d.returning_users / maxVal) * 180, 4)}px`,
+                                    backgroundColor: "#F97316",
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            {/* Label */}
+                            <div className="text-xs text-gray-500 mt-1 text-center truncate w-full" title={d.label}>
+                              {d.label}
+                            </div>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Charts Grid */}
