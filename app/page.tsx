@@ -19,6 +19,7 @@ interface VideoJob {
   retry_count: number | null;
   failed_stage: string | null;
   last_error_code: string | null;
+  photo_validated: boolean | null;
   created_at: string;
   updated_at: string;
 }
@@ -179,7 +180,10 @@ export default function VideoJobsPage() {
 
   useEffect(() => {
     const token = localStorage.getItem("admin_token");
-    if (token) fetchJobs();
+    if (token) {
+      fetchJobs();
+      fetchPhotoValidationSetting();
+    }
   }, [filters.page]);
 
   const handleFilterChange = (key: keyof FilterParams, value: string | number) => {
@@ -343,6 +347,65 @@ export default function VideoJobsPage() {
     }
   };
 
+  // Photo validation toggle state
+  const [photoValidationEnabled, setPhotoValidationEnabled] = useState(true);
+  const [togglingValidation, setTogglingValidation] = useState(false);
+  const [autoOff, setAutoOff] = useState(false);
+
+  const fetchPhotoValidationSetting = async () => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/video-jobs/settings/photo-validation`,
+        { headers: getAuthHeaders() }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setPhotoValidationEnabled(data.enabled);
+        setAutoOff(data.auto_off || false);
+      }
+    } catch (error) {
+      console.error("Failed to fetch photo validation setting:", error);
+    }
+  };
+
+  const togglePhotoValidation = async () => {
+    setTogglingValidation(true);
+    const newValue = !photoValidationEnabled;
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/video-jobs/settings/photo-validation`,
+        {
+          method: "PATCH",
+          headers: {
+            ...getAuthHeaders(),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ enabled: newValue }),
+        }
+      );
+
+      if (response.status === 401 || response.status === 403) {
+        handleUnauthorized();
+        return;
+      }
+
+      if (response.ok) {
+        setPhotoValidationEnabled(newValue);
+        toast.success(
+          `Photo validation ${newValue ? "enabled" : "disabled"}`,
+          { position: "top-right", autoClose: 3000 }
+        );
+      } else {
+        toast.error("Failed to update setting", { position: "top-right", autoClose: 3000 });
+      }
+    } catch (error) {
+      console.error("Toggle error:", error);
+      toast.error("Failed to update setting", { position: "top-right", autoClose: 3000 });
+    } finally {
+      setTogglingValidation(false);
+    }
+  };
+
   const [sendingVideo, setSendingVideo] = useState(false);
 
   const handleSendVideo = async (jobId: number) => {
@@ -382,6 +445,7 @@ export default function VideoJobsPage() {
 
     const colors: Record<string, string> = {
       wait: "bg-orange-100 text-orange-700",
+      unverified_photo: "bg-amber-100 text-amber-700",
       queued: "bg-blue-100 text-blue-700",
       photo_processing: "bg-yellow-100 text-yellow-700",
       photo_done: "bg-green-100 text-green-700",
@@ -408,7 +472,27 @@ export default function VideoJobsPage() {
               <h1 className="text-3xl font-bold text-gray-900">Video Jobs</h1>
               <p className="text-gray-600 mt-1">{message}</p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-3 items-center">
+              {/* Photo Validation Toggle */}
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${autoOff ? "bg-orange-50 border-orange-300" : "bg-gray-50"}`}>
+                <span className="text-xs font-medium text-gray-600 whitespace-nowrap">Photo Check</span>
+                <button
+                  onClick={togglePhotoValidation}
+                  disabled={togglingValidation}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    photoValidationEnabled ? "bg-green-500" : autoOff ? "bg-orange-400" : "bg-gray-300"
+                  } ${togglingValidation ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      photoValidationEnabled ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+                <span className={`text-xs font-semibold ${photoValidationEnabled ? "text-green-600" : autoOff ? "text-orange-600" : "text-red-500"}`}>
+                  {photoValidationEnabled ? "ON" : autoOff ? "AUTO-OFF" : "OFF"}
+                </span>
+              </div>
               <button
                 onClick={() => router.push("/reports")}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold flex items-center gap-2 hover:bg-green-700 transition-colors"
@@ -447,6 +531,7 @@ export default function VideoJobsPage() {
                   >
                     <option value="">All Statuses</option>
                     <option value="wait">Wait</option>
+                    <option value="unverified_photo">Unverified Photo</option>
                     <option value="queued">Queued</option>
                     <option value="photo_processing">Photo Processing</option>
                     <option value="photo_done">Photo Done</option>
@@ -592,6 +677,9 @@ export default function VideoJobsPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Job ID
                     </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Photo
+                    </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Mobile
                     </th>
@@ -630,6 +718,17 @@ export default function VideoJobsPage() {
                     >
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {job.id}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        {job.photo_validated === false ? (
+                          <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700">
+                            Skipped
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-700">
+                            Verified
+                          </span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {job.mobile_number || "N/A"}
@@ -801,6 +900,12 @@ export default function VideoJobsPage() {
                     <DetailField label="Retry Count" value={String(jobDetail.retry_count || 0)} />
                     <DetailField label="Video Count" value={String(jobDetail.video_count ?? "N/A")} />
                     <DetailField
+                      label="Photo Validated"
+                      value={jobDetail.photo_validated === false ? "Skipped" : "Verified"}
+                      badge
+                      badgeColor={jobDetail.photo_validated === false ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}
+                    />
+                    <DetailField
                       label="Terms Accepted"
                       value={jobDetail.terms_accepted === null ? "N/A" : jobDetail.terms_accepted ? "Yes" : "No"}
                     />
@@ -878,6 +983,7 @@ export default function VideoJobsPage() {
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
                 >
                   <option value="">Select new status</option>
+                  <option value="unverified_photo">Unverified Photo</option>
                   <option value="queued">Queued</option>
                   <option value="photo_processing">Photo Processing</option>
                   <option value="photo_done">Photo Done</option>
