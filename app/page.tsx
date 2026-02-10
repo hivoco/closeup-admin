@@ -20,6 +20,8 @@ interface VideoJob {
   failed_stage: string | null;
   last_error_code: string | null;
   photo_validated: boolean | null;
+  terms_accepted: boolean | null;
+  marketing_opt_in: boolean | null;
   created_at: string;
   updated_at: string;
 }
@@ -695,6 +697,12 @@ export default function VideoJobsPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Vibe
                     </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      T&C
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Marketing
+                    </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Retry Count
                     </th>
@@ -750,6 +758,20 @@ export default function VideoJobsPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {job.vibe || "N/A"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        {job.terms_accepted ? (
+                          <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-700">Yes</span>
+                        ) : (
+                          <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700">No</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        {job.marketing_opt_in ? (
+                          <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-700">Yes</span>
+                        ) : (
+                          <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-500">No</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {job.retry_count || 0}
