@@ -409,6 +409,39 @@ export default function VideoJobsPage() {
   };
 
   const [sendingVideo, setSendingVideo] = useState(false);
+  const [editingVideoUrl, setEditingVideoUrl] = useState(false);
+  const [videoUrlInput, setVideoUrlInput] = useState("");
+  const [savingVideoUrl, setSavingVideoUrl] = useState(false);
+
+  const handleSaveVideoUrl = async (jobId: number) => {
+    if (!videoUrlInput.trim()) return;
+    setSavingVideoUrl(true);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/video-jobs/${jobId}/video-url`,
+        {
+          method: "PATCH",
+          headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify({ final_video_url: videoUrlInput.trim() }),
+        }
+      );
+      if (response.ok) {
+        toast.success("Final video URL updated", { position: "top-right", autoClose: 3000 });
+        setEditingVideoUrl(false);
+        // Refresh detail
+        if (jobDetail) {
+          const detailRes = await fetch(`${API_BASE_URL}/api/v1/video-jobs/${jobId}`, { headers: getAuthHeaders() });
+          if (detailRes.ok) setJobDetail(await detailRes.json());
+        }
+      } else {
+        toast.error("Failed to update video URL", { position: "top-right", autoClose: 3000 });
+      }
+    } catch {
+      toast.error("Failed to update video URL", { position: "top-right", autoClose: 3000 });
+    } finally {
+      setSavingVideoUrl(false);
+    }
+  };
 
   const handleSendVideo = async (jobId: number) => {
     if (!confirm("Are you sure you want to send this video to the user via WhatsApp?")) return;
@@ -448,6 +481,7 @@ export default function VideoJobsPage() {
     const colors: Record<string, string> = {
       wait: "bg-orange-100 text-orange-700",
       unverified_photo: "bg-amber-100 text-amber-700",
+      client: "bg-pink-100 text-pink-700",
       queued: "bg-blue-100 text-blue-700",
       photo_processing: "bg-yellow-100 text-yellow-700",
       photo_done: "bg-green-100 text-green-700",
@@ -534,6 +568,7 @@ export default function VideoJobsPage() {
                     <option value="">All Statuses</option>
                     <option value="wait">Wait</option>
                     <option value="unverified_photo">Unverified Photo</option>
+                    <option value="client">Client</option>
                     <option value="queued">Queued</option>
                     <option value="photo_processing">Photo Processing</option>
                     <option value="photo_done">Photo Done</option>
@@ -951,7 +986,45 @@ export default function VideoJobsPage() {
                     <AssetUrlField label="Normalized Image" url={jobDetail.normalized_image_url} />
                     <AssetUrlField label="Lipsync Seg 2" url={jobDetail.lipsync_seg2_url} />
                     <AssetUrlField label="Lipsync Seg 4" url={jobDetail.lipsync_seg4_url} />
-                    <AssetUrlField label="Final Video" url={jobDetail.final_video_url} />
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <AssetUrlField label="Final Video" url={jobDetail.final_video_url} />
+                        <button
+                          onClick={() => {
+                            setEditingVideoUrl(true);
+                            setVideoUrlInput(jobDetail.final_video_url || "");
+                          }}
+                          className="text-blue-600 hover:text-blue-800 ml-2"
+                          title="Edit Final Video URL"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      {editingVideoUrl && (
+                        <div className="flex gap-2 mt-1">
+                          <input
+                            type="text"
+                            value={videoUrlInput}
+                            onChange={(e) => setVideoUrlInput(e.target.value)}
+                            placeholder="Enter final video URL"
+                            className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-primary focus:outline-none"
+                          />
+                          <button
+                            onClick={() => handleSaveVideoUrl(jobDetail.id)}
+                            disabled={savingVideoUrl || !videoUrlInput.trim()}
+                            className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                          >
+                            {savingVideoUrl ? "..." : "Save"}
+                          </button>
+                          <button
+                            onClick={() => setEditingVideoUrl(false)}
+                            className="px-2 py-1 text-xs bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Send Video Button */}
