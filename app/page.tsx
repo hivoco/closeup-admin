@@ -41,6 +41,7 @@ interface VideoJobDetail extends VideoJob {
 interface FilterParams {
   status: string;
   failed_stage: string;
+  vibe: string;
   user_id: string;
   mobile_number: string;
   job_id: string;
@@ -60,6 +61,7 @@ export default function VideoJobsPage() {
   const [filters, setFilters] = useState<FilterParams>({
     status: "",
     failed_stage: "",
+    vibe: "",
     user_id: "",
     mobile_number: "",
     job_id: "",
@@ -117,6 +119,7 @@ export default function VideoJobsPage() {
 
       if (filters.status) params.append("status", filters.status);
       if (filters.failed_stage) params.append("failed_stage", filters.failed_stage);
+      if (filters.vibe) params.append("vibe", filters.vibe);
       if (filters.user_id) params.append("user_id", filters.user_id);
       if (filters.mobile_number) params.append("mobile_number", filters.mobile_number);
       if (filters.job_id) params.append("job_id", filters.job_id);
@@ -201,6 +204,7 @@ export default function VideoJobsPage() {
     setFilters({
       status: "",
       failed_stage: "",
+      vibe: "",
       user_id: "",
       mobile_number: "",
       job_id: "",
@@ -595,6 +599,22 @@ export default function VideoJobsPage() {
                     <option value="lipsync">Lipsync</option>
                     <option value="stitch">Stitch</option>
                     <option value="delivery">Delivery</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Vibe
+                  </label>
+                  <select
+                    value={filters.vibe}
+                    onChange={(e) => handleFilterChange("vibe", e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none"
+                  >
+                    <option value="">All Vibes</option>
+                    <option value="romantic">Romantic</option>
+                    <option value="rock">Rock</option>
+                    <option value="rap">Rap</option>
                   </select>
                 </div>
 
