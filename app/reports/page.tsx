@@ -36,6 +36,22 @@ interface TrendResponse {
   data: TrendDataPoint[];
 }
 
+interface SourceDetail {
+  source: string;
+  total: number;
+  sent: number;
+  failed: number;
+  in_progress: number;
+  conversion_rate: number;
+}
+
+interface TrafficSourcesResponse {
+  utm_source: Record<string, number>;
+  utm_medium: Record<string, number>;
+  utm_campaign: Record<string, number>;
+  source_detail: SourceDetail[];
+}
+
 const COLORS = [
   "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6",
   "#EC4899", "#06B6D4", "#84CC16", "#F97316", "#6366F1"
@@ -50,6 +66,7 @@ export default function ReportsPage() {
   const [trendMode, setTrendMode] = useState<"day" | "week">("day");
   const [trendData, setTrendData] = useState<TrendDataPoint[]>([]);
   const [trendLoading, setTrendLoading] = useState(false);
+  const [trafficSources, setTrafficSources] = useState<TrafficSourcesResponse | null>(null);
 
   const getAuthHeaders = (): HeadersInit => {
     const token = localStorage.getItem("admin_token");
@@ -68,6 +85,7 @@ export default function ReportsPage() {
     } else {
       fetchReports();
       fetchTrend();
+      fetchTrafficSources();
     }
   }, [router]);
 
@@ -149,6 +167,31 @@ export default function ReportsPage() {
     }
   };
 
+  const fetchTrafficSources = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (startDate) params.append("start_date", startDate);
+      if (endDate) params.append("end_date", endDate);
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/video-jobs/reports/traffic-sources?${params.toString()}`,
+        { headers: getAuthHeaders() }
+      );
+
+      if (response.status === 401) {
+        handleUnauthorized();
+        return;
+      }
+
+      if (!response.ok) throw new Error("Failed to fetch traffic sources");
+
+      const data: TrafficSourcesResponse = await response.json();
+      setTrafficSources(data);
+    } catch (error) {
+      console.error("Traffic sources fetch error:", error);
+    }
+  };
+
   const fetchTrend = async (mode: "day" | "week" = trendMode) => {
     setTrendLoading(true);
     try {
@@ -186,12 +229,13 @@ export default function ReportsPage() {
   const handleFilter = () => {
     fetchReports();
     fetchTrend();
+    fetchTrafficSources();
   };
 
   const clearFilters = () => {
     setStartDate("");
     setEndDate("");
-    setTimeout(() => { fetchReports(); fetchTrend(); }, 0);
+    setTimeout(() => { fetchReports(); fetchTrend(); fetchTrafficSources(); }, 0);
   };
 
   // Simple bar chart component
@@ -519,6 +563,60 @@ export default function ReportsPage() {
               {/* Vibe */}
               <BarChart data={reportData.counts.vibe} title="Vibe Distribution" />
             </div>
+
+            {/* Traffic Sources */}
+            {trafficSources && (
+              <div className="mt-6">
+                <h2 className="text-xl font-bold text-gray-800 mb-4">Traffic Sources</h2>
+
+                {/* Conversion Table per UTM Source */}
+                {trafficSources.source_detail && trafficSources.source_detail.length > 0 && (
+                  <div className="bg-white rounded-lg shadow p-4 mb-6">
+                    <h3 className="text-lg font-semibold mb-4 text-gray-800">Source-wise Conversions</h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b text-left text-gray-500">
+                            <th className="pb-2 pr-4">Source</th>
+                            <th className="pb-2 pr-4 text-right">Submissions</th>
+                            <th className="pb-2 pr-4 text-right">Sent</th>
+                            <th className="pb-2 pr-4 text-right">Failed</th>
+                            <th className="pb-2 pr-4 text-right">In Progress</th>
+                            <th className="pb-2 text-right">Conversion %</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {trafficSources.source_detail.map((row) => (
+                            <tr key={row.source} className="border-b last:border-0">
+                              <td className="py-2 pr-4 font-medium text-gray-800">{row.source}</td>
+                              <td className="py-2 pr-4 text-right">{row.total}</td>
+                              <td className="py-2 pr-4 text-right text-green-600 font-medium">{row.sent}</td>
+                              <td className="py-2 pr-4 text-right text-red-600 font-medium">{row.failed}</td>
+                              <td className="py-2 pr-4 text-right text-amber-600">{row.in_progress}</td>
+                              <td className="py-2 text-right">
+                                <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
+                                  row.conversion_rate >= 50 ? "bg-green-100 text-green-700" :
+                                  row.conversion_rate >= 20 ? "bg-amber-100 text-amber-700" :
+                                  "bg-red-100 text-red-700"
+                                }`}>
+                                  {row.conversion_rate}%
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <BarChart data={trafficSources.utm_source} title="UTM Source" />
+                  <BarChart data={trafficSources.utm_medium} title="UTM Medium" />
+                  <BarChart data={trafficSources.utm_campaign} title="UTM Campaign" />
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <div className="text-center text-gray-500 py-12">
